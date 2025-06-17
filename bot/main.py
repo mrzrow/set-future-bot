@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Bot, Dispatcher
 
 from .config.config import TOKEN
 from .handlers import create_commands, register_commands

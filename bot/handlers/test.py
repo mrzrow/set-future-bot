@@ -1,12 +1,10 @@
-from collections import defaultdict
-
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from bot.utils.test import questions
+from bot.utils.test import questions, Quiz
 from bot.utils.fsm import StateMachine
-from bot.utils.messages import RESULT_DESIGN_MESSAGE, RESULT_BUISINESS_MESSAGE, TEST_START_MESSAGE, RESULT_MESSAGE
+from bot.utils.messages import TEST_START_MESSAGE
 
 
 async def h_start_test(message: Message, state: FSMContext):
@@ -15,69 +13,45 @@ async def h_start_test(message: Message, state: FSMContext):
         parse_mode=ParseMode.HTML,
     )
 
-    await state.update_data(
-        questions=questions,
-        current_question=0,
-        score=defaultdict(int),
-    )
-
-    state_data = await state.get_data()
-    current_question = state_data.get('current_question')
-    question = state_data.get('questions')[current_question]
+    quiz = Quiz(questions=questions)
 
     await message.answer(
-        text=question.to_text(current_question + 1),
-        parse_mode=ParseMode.HTML,
+        text=quiz.get_question_text(),
+        parse_mode=ParseMode.HTML
     )
 
     await state.set_state(StateMachine.test)
+    await state.update_data(quiz=quiz)
 
 
 async def h_answer_test(message: Message, state: FSMContext):
-    try:
-        number = int(message.text) - 1
-    except ValueError:
-        await message.answer(
-            text='Пожалуйста, введите номер ответа.',
-            parse_mode=ParseMode.HTML,
+    if not message.text.isdigit():  # проверяем, что пришло число
+        return await message.answer(
+            text='Введите, пожалуйста, корректный номер ответа',
+            parse_mode=ParseMode.HTML
         )
-        return
-
-    state_data = await state.get_data()
-    current_question = state_data.get('current_question')
-    questions = state_data.get('questions')
-    question = questions[current_question]
-    score = state_data.get('score')
-
-    try:
-        current_score = question.get_score(number)
-    except ValueError as e:
-        await message.answer(
-            text=str(e),
-            parse_mode=ParseMode.HTML,
-        )
-        return
-
-    score[current_score] += 1
-    await state.update_data(score=score)
-
-    current_question += 1
-    if current_question >= len(questions):
-        if score[2] > score[1]:
-            msg = RESULT_DESIGN_MESSAGE
-        else:
-            msg = RESULT_BUISINESS_MESSAGE
-        await message.answer(
-            text=RESULT_MESSAGE.format(msg),
-            parse_mode=ParseMode.HTML,
-        )
-        await state.clear()
-        return
     
-    await state.update_data(current_question=current_question)
-    question = questions[current_question]
-
-    await message.answer(
-        text=question.to_text(current_question + 1),
-        parse_mode=ParseMode.HTML,
+    data = await state.get_data()
+    quiz: Quiz = data.get('quiz')
+    answer_number = int(message.text) - 1
+    try:  # проверяем число на корректность и учитываем результат
+        quiz.set_result(answer_number=answer_number)
+    except ValueError as e:
+        return await message.answer(
+            text=f'{e}',
+            parse_mode=ParseMode.HTML
+        )
+    
+    quiz.move_to_next_question()  # переходим к следующему вопросу
+    if quiz.is_end():  # если вопросы закончились, то выводим результат
+        await message.answer(
+            text=quiz.get_result_message(),
+            parse_mode=ParseMode.HTML
+        )
+        return await state.clear()
+    
+    await message.answer(  # выводим текст следующего вопроса
+        quiz.get_question_text(),
+        parse_mode=ParseMode.HTML
     )
+    await state.update_data(quiz=quiz)

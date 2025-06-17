@@ -1,69 +1,150 @@
+from collections import Counter
+
+from .study_enum import Study
+from .messages import RESULT_MESSAGE, COURSES_BULLET_POINTS, COURSES_NAMES
+
+
 class Question:
     def __init__(
             self,
             question: str,
-            answers: list[str],
-            scores: list[int],
+            answers: tuple[str, ...],
+            points: tuple[tuple[Study, Study], ...]
     ):
         self.question = question
         self.answers = answers
-        self.scores = scores
-
-    def to_text(self, number: int) -> str:
-        answers = '\n'.join([f'{i}) {answer}' for i, answer in enumerate(self.answers, 1)])
-        return f'{number}. {self.question}\n{answers}'
+        self.points = points
+        self.questions_number = len(self.answers)
     
-    def get_score(self, answer_number: int) -> int:
-        if answer_number not in range(len(self.scores)):
-            raise ValueError(f'Номер ответа {answer_number} не найден в списке ответов.')
-        return self.scores[answer_number]
+    def get_answer(self, answer_number: int) -> tuple[Study, Study]:
+        if answer_number < 0 or answer_number >= self.questions_number:
+            raise ValueError('Неверный номер ответа')
+        return self.points[answer_number]
+
+    def get_question_text(self) -> str:
+        msg = f'{self.question}\n'
+        for i, answ in enumerate(self.answers, 1):
+            msg += f'{i}. {answ}\n'
+        return msg
 
 
-question1 = Question(
-    question='Какие задачи вам интереснее решать?',
-    answers=[
-        'Планирование и управление проектами',
-        'Создание уникальных визуальных решений для брендов и продуктов',
-    ],
-    scores=[1, 2]
-)
-question2 = Question(
-    question='Что тебе кажется более увлекательным в рамках учебной или профессиональной деятельности?',
-    answers=[
-        'Разработка рекламных кампаний',
-        'Анализ рынка и поиск интересных идей для бизнеса'
-    ],
-    scores=[2, 1]
-)
-question3 = Question(
-    question='Что вам интересно больше в будущем?',
-    answers=[
-        'Работа в крупной компании или собственный бизнес',
-        'Креативная работа в агентствах или фриланс'
-    ],
-    scores=[1, 2]
-)
-question4 = Question(
-    question='Как бы вы описали свой идеальный проект?',
-    answers=[
-        'Проект, который требует хорошего управления, организации и планирования',
-        'Проект, где я могу использовать свою креативность и навыки в графическом дизайне'
-    ],
-    scores=[1, 2]
-)
-question5 = Question(
-    question='В чем вы видите свои сильные стороны?',
-    answers=[
-        'Логика, планирование, ответственность за результат',
-        'Творческий подход, внимание к деталям, визуальное восприятие'
-    ],
-    scores=[1, 2]
-)
+class Quiz:
+    def __init__(self, questions: tuple[Question, ...]):
+        self.questions = questions
+        self.iter = 0
+        self.counter = Counter()
 
-questions = [
-    question1,
-    question2,
-    question3,
-    question4,
-    question5
-]
+    def move_to_next_question(self) -> None:
+        self.iter += 1
+
+    def is_end(self) -> bool:
+        return self.iter >= len(questions)
+    
+    def get_question_text(self) -> str:
+        return self.questions[self.iter].get_question_text()
+    
+    def set_result(self, answer_number: int) -> None:
+        result = self.questions[self.iter].get_answer(answer_number=answer_number)
+        self.counter.update(result)
+
+    def get_result_message(self) -> str:
+        course = self.counter.most_common(1)[0][0]
+        msg = RESULT_MESSAGE.format(COURSES_BULLET_POINTS[course], COURSES_NAMES[course])
+        return msg
+    
+
+questions = (
+    Question(
+        question='<b>Что тебе интереснее всего?</b> 🧡',
+        answers=(
+            'Разобраться, как устроена компания изнутри',
+            'Создавать визуальную часть проекта (дизайн, верстка)',
+            'Делать креативный контент, снимать, писать',
+            'Использовать нейросети для упрощения задач',
+        ),
+        points=(
+            (Study.business, Study.marketing),
+            (Study.web, Study.smm),
+            (Study.smm, Study.communication),
+            (Study.ai, Study.marketing),
+        )
+    ),
+    Question(
+        question='<b>Какая роль тебе ближе?</b> 🔎',
+        answers=(
+            'Организатор — собрать команду, распределить задачи',
+            'Идейный вдохновитель — упаковывать и доносить идеи',
+            'Тихий стратег — анализировать, предлагать решения',
+        ),
+        points=(
+            (Study.event, Study.business),
+            (Study.smm, Study.communication),
+            (Study.marketing, Study.ai),
+        )
+    ),
+    Question(
+        question='<b>С чего ты начнёшь работу над проектом?</b> 🚀',
+        answers=(
+            'Узнаю, кто ЦА и как им продать идею',
+            'Нарисую визуал и подумаю о стиле',
+            'Разложу всё по этапам и организую процесс',
+        ),
+        points=(
+            (Study.marketing, Study.communication),
+            (Study.web, Study.smm),
+            (Study.business, Study.event),
+        )
+    ),
+    Question(
+        question='<b>Что тебе ближе по темпераменту?</b> 🎯',
+        answers=(
+            'Логика, чёткость, работа с цифрами',
+            'Эмоции, яркость, общение с людьми',
+            'Визуальное мышление, композиция',
+        ),
+        points=(
+            (Study.ai, Study.marketing, Study.business),
+            (Study.smm, Study.communication, Study.event),
+            (Study.web, Study.smm),
+        )
+    ),
+    Question(
+        question='<b>Что вдохновляет больше?</b> 🏅',
+        answers=(
+            'Упорядочить хаос и собрать процесс «под ключ»',
+            'Сделать проект, которым можно делиться в соцсетях',
+            'Понять, как работает система, и улучшить её',
+        ),
+        points=(
+            (Study.business, Study.event),
+            (Study.smm, Study.web, Study.communication),
+            (Study.ai, Study.marketing),
+        )
+    ),
+    Question(
+        question='<b>Представь: презентация проекта. Твоя зона ответственности?</b> 🖇️',
+        answers=(
+            'Выступаю, убеждаю, договариваюсь',
+            'Показываю макеты, визуальные решения',
+            'Анализирую метрики и стратегию',
+        ),
+        points=(
+            (Study.communication, Study.event, Study.marketing),
+            (Study.smm, Study.web),
+            (Study.ai, Study.marketing),
+        )
+    ),
+    Question(
+        question='<b>Что важнее всего в работе?</b> 🤍',
+        answers=(
+            'Осмысленность и возможность расти',
+            'Творческая реализация',
+            'Возможность изучать новое и делать «умную» работу',
+        ),
+        points=(
+            (Study.business, Study.event, Study.marketing),
+            (Study.smm, Study.web, Study.communication),
+            (Study.ai, Study.marketing),
+        )
+    )
+)
